@@ -1,4 +1,4 @@
-## Hello
+## Ansible
 
 ```bash
 ansible -m shell -a 'whoami' all
@@ -13,8 +13,7 @@ ufw allow 5432/tcp
 ufw allow 80/tcp
 ufw allow 8000/tcp
 
-psql -h 165.22.106.25 -U wk -d wk -W
-psql -h 165.22.106.25 -U wk -d app -W
+psql -h 157.245.50.143 -U wk -d wk -W
 ```
 
 ## Resource

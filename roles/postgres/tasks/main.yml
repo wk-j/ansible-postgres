@@ -1,18 +1,15 @@
-- name: ensure apt cache is up to date
-  become: false
-  apt: update_cache=yes
-
 - name: ensure packages are installed
   become: false
   apt:
+    update_cache: yes
     name:
-      [
-        postgresql-10,
+      [ postgresql-10,
         postgresql-contrib,
         libpq-dev,
-        python-pip,
+        # python-pip,
+        python3-pip,
         python-psycopg2,
-        python3-psycopg2,
+        python3-psycopg2
       ]
 
 - name: intall library
@@ -21,38 +18,68 @@
     name: ipaddress
 
 - name: ensure database is created
-  postgresql_db: name={{dbname}}
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: '{{dbname}}'
 
 - name: ensure user has access to database
-  postgresql_user: db={{dbname}} name={{dbuser}} password={{dbpassword}} priv=ALL
+  become: true
+  become_user: postgres
+  postgresql_user:
+    db: '{{dbname}}'
+    name: '{{dbuser}}'
+    password: '{{dbpassword}}'
+    priv: ALL
 
 - name: ensure user does not have unnecessary privilege
-  postgresql_user: name={{dbuser}} role_attr_flags=NOSUPERUSER,NOCREATEDB
+  become: true
+  become_user: postgres
+  postgresql_user:
+    name: '{{dbuser}}'
+    role_attr_flags: NOSUPERUSER,NOCREATEDB
 
 - name: ensure no other user can access the database
-  postgresql_privs: db={{dbname}} role=PUBLIC type=database priv=ALL state=absent
+  become: true
+  become_user: postgres
+  postgresql_privs:
+    db: '{{dbname}}'
+    role: PUBLIC
+    type: database
+    priv: ALL
+    state: absent
 
 - name: postgresql should listen on all ports
   notify:
     - restart
-  lineinfile: dest=/etc/postgresql/10/main/postgresql.conf regexp="^listen_addresses" line="listen_addresses = '*'" state=present
+  lineinfile:
+    dest: "/etc/postgresql/10/main/postgresql.conf"
+    regexp: "^listen_addresses"
+    line: "listen_addresses = '*'"
+    state: "present"
 
-## app
-- name: ensure database is created
-  postgresql_db: name=app
+- name: remove line
+  notify:
+    - restart
+  lineinfile:
+    dest: /etc/postgresql/10/main/pg_hba.conf
+    state: absent
+    regexp: '.*md5$'
 
-- name: ensure user has access to database
-  postgresql_user: db=app name={{dbuser}} password={{dbpassword}} priv=ALL
-
-# host all all 0.0.0.0/0 md5
-- name: Grant users
+- name: allow remote connection
   notify:
     - restart
   postgresql_pg_hba:
     dest: /etc/postgresql/10/main/pg_hba.conf
     contype: host
-    users: all
+    users: '{{dbuser}}'
     source: "0.0.0.0/0"
-    databases: all
+    databases: '{{dbname}}'
     method: md5
     create: true
+
+- name: allow all access to tcp port 5432
+  ufw:
+    rule: allow
+    port: '5432'
+    proto: tcp
